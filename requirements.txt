@@ -1,0 +1,8 @@
+# For running the web services
+fastapi
+uvicorn
+httpx
+
+# For connecting to PostgreSQL with SQLAlchemy
+sqlalchemy
+psycopg2-binary

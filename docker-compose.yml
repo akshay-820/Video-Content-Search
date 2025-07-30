@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=registry_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - video-net
+
+  registry:
+    build: .  # This now looks for the Dockerfile
+    command: uvicorn registry:app --host 0.0.0.0 --port 8000
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://admin:secret@db:5432/registry_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - video-net
+
+  input-router:
+    build: .  # This uses the same Dockerfile
+    command: uvicorn main_api:app --host 0.0.0.0 --port 8080
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - registry
+    networks:
+      - video-net
+
+networks:
+  video-net:
+
+volumes:
+  postgres_data:
