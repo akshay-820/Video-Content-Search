@@ -37,6 +37,21 @@ services:
     networks:
       - video-net
 
+  extractor-1:
+    build: .
+    command: uvicorn extractor:app --host 0.0.0.0 --port 9000
+    restart: always
+    environment:
+      - REGISTRY_URL=http://registry:8000
+      - EXTRACTOR_ID=extractor-1
+      - EXTRACTOR_URL=http://extractor-1:9000
+    ports: # Exposing the port is useful for direct testing/debugging
+      - "9000:9000"
+    depends_on:
+      - registry
+    networks:
+      - video-net
+
 networks:
   video-net:
 

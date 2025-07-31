@@ -6,4 +6,12 @@ httpx
 # For connecting to PostgreSQL with SQLAlchemy
 sqlalchemy
 psycopg2-binary
-##hi
+
+# --- For the Extractor Service ---
+
+# For AI/ML model loading and processing
+torch
+Pillow
+
+# OpenCLIP for generating embeddings
+open-clip-torch
