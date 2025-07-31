@@ -15,3 +15,6 @@ Pillow
 
 # OpenCLIP for generating embeddings
 open-clip-torch
+
+# Python bindings for GStreamer (GObject Introspection)
+PyGObject
