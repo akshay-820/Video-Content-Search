@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=registry_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - video-net
+    # Add this healthcheck section to wait for the database to be ready
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d registry_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  registry:
+    build: .
+    command: uvicorn registry:app --host 0.0.0.0 --port 8000
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://admin:secret@db:5432/registry_db
+    ports:
+      - "8000:8000"
+    # Modify depends_on to wait for the healthcheck to pass
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - video-net
+
+  input-router:
+    build: .
+    command: uvicorn main_api:app --host 0.0.0.0 --port 8080
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - registry
+    networks:
+      - video-net
+
+  # --- Parallelized Extractor 1 ---
+  extractor-1:
+    build: .
+    command: uvicorn extractor:app --host 0.0.0.0 --port 8001
+    restart: always
+    environment:
+      - EXTRACTOR_ID=extractor-1
+      - EXTRACTOR_URL=http://extractor-1:8001
+      - PYTHONPATH=/usr/lib/python3/dist-packages
+    depends_on:
+      - registry
+    volumes:
+      - ./extracted_frames:/app/extracted_frames
+      - ./videos:/app/videos
+    networks:
+      - video-net
+
+  # --- Parallelized Extractor 2 ---
+  extractor-2:
+    build: .
+    command: uvicorn extractor:app --host 0.0.0.0 --port 8002
+    restart: always
+    environment:
+      - EXTRACTOR_ID=extractor-2
+      - EXTRACTOR_URL=http://extractor-2:8002
+      - PYTHONPATH=/usr/lib/python3/dist-packages
+    depends_on:
+      - registry
+    volumes:
+      - ./extracted_frames:/app/extracted_frames
+      - ./videos:/app/videos
+    networks:
+      - video-net
+
+networks:
+  video-net:
+
+volumes:
+  postgres_data:
