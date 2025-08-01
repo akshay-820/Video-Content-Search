@@ -2,8 +2,15 @@
 fastapi
 uvicorn
 httpx
+python-multipart
 
 # For connecting to PostgreSQL
 sqlalchemy
 psycopg2-binary
+
+# For Embedder Service
+torch
+open_clip_torch
+pymilvus
+Pillow
 

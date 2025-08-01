@@ -1,6 +1,65 @@
 version: '3.8'
 
 services:
+  # --- MILVUS VECTOR DB ---
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.14
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_HEARTBEAT_INTERVAL=500
+      - ETCD_ELECTION_TIMEOUT=2500
+    volumes:
+      - ./volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - video-net
+
+  minio:
+    image: minio/minio # Use the standard Docker Hub image
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - ./volumes/minio:/minio_data
+    # Updated command for modern Minio versions
+    command: minio server /minio_data --console-address ":9090"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - video-net
+
+  milvus-standalone:
+    image: milvusdb/milvus:v2.4.4
+    platform: linux/amd64
+    command: ["/milvus/bin/milvus", "run", "standalone"]
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - MINIO_ADDRESS=minio:9000
+    volumes:
+      - ./volumes/milvus:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      etcd:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    networks:
+      - video-net
+
+
+  # --- POSTGRES DB & REGISTRY (from before) ---
   db:
     image: postgres:15
     restart: always
@@ -9,15 +68,14 @@ services:
       - POSTGRES_PASSWORD=secret
       - POSTGRES_DB=registry_db
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    networks:
-      - video-net
-    # Add this healthcheck section to wait for the database to be ready
+      - ./volumes/postgres_data:/var/lib/postgresql/data/
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d registry_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - video-net
 
   registry:
     build: .
@@ -25,27 +83,20 @@ services:
     restart: always
     environment:
       - DATABASE_URL=postgresql://admin:secret@db:5432/registry_db
-    ports:
-      - "8000:8000"
-    # Modify depends_on to wait for the healthcheck to pass
     depends_on:
-      db:
-        condition: service_healthy
+      db: { condition: service_healthy }
     networks:
       - video-net
 
+  # --- API & EXTRACTORS (from before) ---
   input-router:
     build: .
     command: uvicorn main_api:app --host 0.0.0.0 --port 8080
-    restart: always
-    ports:
-      - "8080:8080"
-    depends_on:
-      - registry
+    ports: ["8080:8080"]
+    depends_on: [registry]
     networks:
       - video-net
 
-  # --- Parallelized Extractor 1 ---
   extractor-1:
     build: .
     command: uvicorn extractor:app --host 0.0.0.0 --port 8001
@@ -54,15 +105,13 @@ services:
       - EXTRACTOR_ID=extractor-1
       - EXTRACTOR_URL=http://extractor-1:8001
       - PYTHONPATH=/usr/lib/python3/dist-packages
-    depends_on:
-      - registry
+    depends_on: [registry]
     volumes:
       - ./extracted_frames:/app/extracted_frames
       - ./videos:/app/videos
     networks:
       - video-net
-
-  # --- Parallelized Extractor 2 ---
+  
   extractor-2:
     build: .
     command: uvicorn extractor:app --host 0.0.0.0 --port 8002
@@ -71,11 +120,49 @@ services:
       - EXTRACTOR_ID=extractor-2
       - EXTRACTOR_URL=http://extractor-2:8002
       - PYTHONPATH=/usr/lib/python3/dist-packages
-    depends_on:
-      - registry
+    depends_on: [registry]
     volumes:
       - ./extracted_frames:/app/extracted_frames
       - ./videos:/app/videos
+    networks:
+      - video-net
+
+  # --- NEW EMBEDDER SERVICES ---
+  embedder-1:
+    build: .
+    command: python embedder.py
+    restart: always
+    depends_on:
+      milvus-standalone:
+        # CHANGE THIS CONDITION
+        condition: service_healthy
+    volumes:
+      - ./extracted_frames:/app/extracted_frames
+    networks:
+      - video-net
+
+  embedder-2:
+    build: .
+    command: python embedder.py
+    restart: always
+    depends_on:
+      milvus-standalone:
+        # AND CHANGE THIS CONDITION
+        condition: service_healthy
+    volumes:
+      - ./extracted_frames:/app/extracted_frames
+    networks:
+      - video-net
+  
+  query-api:
+    build: .
+    command: uvicorn query_api:app --host 0.0.0.0 --port 8090
+    restart: always
+    ports:
+      - "8090:8090"
+    depends_on:
+      milvus-standalone:
+        condition: service_healthy
     networks:
       - video-net
 
@@ -83,4 +170,9 @@ networks:
   video-net:
 
 volumes:
+  # Define all persistent volumes
+  etcd:
+  minio:
+  milvus:
   postgres_data:
+
