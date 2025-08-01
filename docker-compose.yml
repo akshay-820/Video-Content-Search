@@ -1,64 +1,3 @@
-<<<<<<< HEAD
-version: '3.8'
-
-services:
-  db:
-    image: postgres:15
-    restart: always
-    environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=secret
-      - POSTGRES_DB=registry_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    networks:
-      - video-net
-
-  registry:
-    build: .  # This now looks for the Dockerfile
-    command: uvicorn registry:app --host 0.0.0.0 --port 8000
-    restart: always
-    environment:
-      - DATABASE_URL=postgresql://admin:secret@db:5432/registry_db
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    networks:
-      - video-net
-
-  input-router:
-    build: .  # This uses the same Dockerfile
-    command: uvicorn main_api:app --host 0.0.0.0 --port 8080
-    restart: always
-    ports:
-      - "8080:8080"
-    depends_on:
-      - registry
-    networks:
-      - video-net
-
-  extractor-1:
-    build: .
-    command: uvicorn extractor:app --host 0.0.0.0 --port 9000
-    restart: always
-    environment:
-      - REGISTRY_URL=http://registry:8000
-      - EXTRACTOR_ID=extractor-1
-      - EXTRACTOR_URL=http://extractor-1:9000
-    ports: # Exposing the port is useful for direct testing/debugging
-      - "9000:9000"
-    depends_on:
-      - registry
-    networks:
-      - video-net
-
-networks:
-  video-net:
-
-volumes:
-  postgres_data:
-=======
 version: '3.8'
 
 services:
@@ -145,4 +84,3 @@ networks:
 
 volumes:
   postgres_data:
->>>>>>> Vipul

@@ -1,25 +1,3 @@
-<<<<<<< HEAD
-# For running the web services
-fastapi
-uvicorn
-httpx
-
-# For connecting to PostgreSQL with SQLAlchemy
-sqlalchemy
-psycopg2-binary
-
-# --- For the Extractor Service ---
-
-# For AI/ML model loading and processing
-torch
-Pillow
-
-# OpenCLIP for generating embeddings
-open-clip-torch
-
-# Python bindings for GStreamer (GObject Introspection)
-PyGObject
-=======
 # For running the web services
 fastapi
 uvicorn
@@ -29,4 +7,3 @@ httpx
 sqlalchemy
 psycopg2-binary
 
->>>>>>> Vipul
