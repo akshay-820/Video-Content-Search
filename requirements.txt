@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # For running the web services
 fastapi
 uvicorn
@@ -18,3 +19,14 @@ open-clip-torch
 
 # Python bindings for GStreamer (GObject Introspection)
 PyGObject
+=======
+# For running the web services
+fastapi
+uvicorn
+httpx
+
+# For connecting to PostgreSQL
+sqlalchemy
+psycopg2-binary
+
+>>>>>>> Vipul
